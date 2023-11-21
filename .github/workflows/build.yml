@@ -1,0 +1,94 @@
+# vim: set filetype=yaml ts=2 sw=2 sts=2 et:
+---
+name: 'Build docker image'
+
+env:
+  # Enforce "latest" docker image tag. Be careful, images with latest tag will
+  # be taken to the production automatically!
+  WF_ENFORCE_LATEST_TAG: false
+
+on:
+  push:
+
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: 'git ref (branch, tag, commit sha)'
+        required: false
+        default: 'main'
+
+  schedule:
+    # https://crontab.guru/every-week
+    - cron:  '0 0 * * 0'
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  build:
+    concurrency: ${{ github.workflow_ref }}-${{ github.ref }}
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to GitHub docker registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Determine git ref based on workflow trigger event
+        id: repository
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            GIT_REF="${{ github.event.inputs.git_ref }}"
+            [ "${GIT_REF}" == "" ] && GIT_REF="master"
+          else
+            GIT_REF="${{ github.ref }}"
+          fi
+          GIT_REF="$(echo -n "${GIT_REF}" | awk '{ gsub(/^refs\/(heads|tags)\//, ""); print }')"
+          echo "git_ref=${GIT_REF}" >> "${GITHUB_OUTPUT}"
+
+      # don't use ref: with act (it will checkout repo and will ignore local changes)
+      - name: "[DEBUG] actions/checkout"
+        if: ${{ env.ACT }}
+        uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        if: ${{ ! env.ACT }}
+        with:
+          ref: ${{ steps.repository.outputs.git_ref }}
+
+      - name: Build and push docker image
+        run: |
+          if [ "${WF_ENFORCE_LATEST_TAG}" == "true" ]; then
+            IMAGE_TAG="latest"
+          else
+            # This code transform branch name to the docker image tag, it does:
+            # - Humanize branch-name (convert non-latin symbols to '-');
+            # - Rename man/master to the 'latest'
+            IMAGE_TAG="$( \
+              echo -n "${{ steps.repository.outputs.git_ref }}" | awk '{
+                gsub(/[^0-9A-Za-z]/, "-")
+                gsub(/^master|^main/, "latest")
+                print
+              }' \
+            )"
+          fi
+          # Convert IMAGE_TAG to the lowercase
+          IMAGE_TAG="${IMAGE_TAG,,}"
+          # Additional tag based on timestamp in YYYYMMDD format
+          TIMESTAMP_TAG="$(date +%Y%m%d)"
+
+          IMAGE="ghcr.io/${{ github.repository }}"
+
+          BUILDX="$(docker buildx create)"
+          docker buildx use "${BUILDX}"
+
+          docker buildx build \
+            --push \
+            --platform "linux/amd64,linux/arm64,linux/arm/v7" \
+            --pull \
+            --tag "${IMAGE}:${IMAGE_TAG}" \
+            --tag "${IMAGE}:${TIMESTAMP_TAG}" \
+            --file ./Dockerfile \
+            .
+
