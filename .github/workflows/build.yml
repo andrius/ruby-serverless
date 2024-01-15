@@ -1,6 +1,6 @@
 # vim: set filetype=yaml ts=2 sw=2 sts=2 et:
 ---
-name: 'Build docker image'
+name: "Build docker image"
 
 env:
   # Enforce "latest" docker image tag. Be careful, images with latest tag will
@@ -13,13 +13,13 @@ on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: 'git ref (branch, tag, commit sha)'
+        description: "git ref (branch, tag, commit sha)"
         required: false
-        default: 'main'
+        default: "main"
 
   schedule:
     # https://crontab.guru/every-week
-    - cron:  '0 0 * * 0'
+    - cron: "0 0 * * 0"
 
 defaults:
   run:
@@ -28,7 +28,7 @@ defaults:
 jobs:
   build:
     concurrency: ${{ github.workflow_ref }}-${{ github.ref }}
-    timeout-minutes: 30
+    timeout-minutes: 5
     runs-on: ubuntu-latest
 
     steps:
@@ -91,4 +91,3 @@ jobs:
             --tag "${IMAGE}:${TIMESTAMP_TAG}" \
             --file ./Dockerfile \
             .
-
