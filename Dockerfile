@@ -7,17 +7,17 @@ LABEL org.opencontainers.image.description = "An alpine-based Docker environment
 ENV LANG C.UTF-8
 
 RUN \
-apk add \
-	ca-certificates \
-	less \
-	libressl \
-	npm \
-	ruby \
-	ruby-bigdecimal \
-	ruby-bundler \
-	ruby-etc \
-	ruby-io-console \
-	ruby-irb \
-	nodejs
+  apk add \
+  ca-certificates \
+  less \
+  libressl \
+  npm \
+  ruby \
+  ruby-bigdecimal \
+  ruby-bundler \
+  ruby-etc \
+  ruby-io-console \
+  ruby-irb \
+  nodejs
 
 RUN npm install -g serverless
