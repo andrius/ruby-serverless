@@ -85,7 +85,7 @@ jobs:
 
           docker buildx build \
             --push \
-            --platform "linux/amd64,linux/arm64,linux/arm/v7" \
+            --platform "linux/amd64,linux/arm64" \
             --pull \
             --tag "${IMAGE}:${IMAGE_TAG}" \
             --tag "${IMAGE}:${TIMESTAMP_TAG}" \
